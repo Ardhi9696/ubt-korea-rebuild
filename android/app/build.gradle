@@ -1,5 +1,6 @@
 plugins {
     id "com.android.application"
+    id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -31,6 +32,10 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
@@ -48,15 +53,6 @@ android {
         release {
             signingConfig signingConfigs.debug
         }
-    }
-}
-
-// Built-in Kotlin (Flutter 3.47): KGP tidak lagi di-apply manual di atas;
-// Flutter Gradle plugin yang menyediakan Kotlin. Lihat
-// https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 

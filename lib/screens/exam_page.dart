@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:flutter/services.dart';
 
 import '../dummy_data.dart';
 import '../main.dart';
@@ -10,7 +10,8 @@ import 'result_screen.dart';
 /// Halaman ujian (dummy) — meniru `exam_page` di app Korea:
 /// topbar detail peserta, timer mundur, soal + 4 pilihan,
 /// audio play-once (file nada test `assets/audio/test_tone.mp3`,
-/// diputar lewat just_audio — sama seperti app asli yang pakai just_audio),
+/// diputar lewat MethodChannel + MediaPlayer bawaan Android di
+/// MainActivity.kt — tanpa plugin pihak ketiga),
 /// kontrol kecepatan 0.75x/1.0x/1.25x/1.5x yang mengubah kecepatan putar,
 /// grid total soal (bottom sheet), submit manual + auto-submit saat waktu habis.
 class ExamPage extends StatefulWidget {
@@ -27,6 +28,14 @@ class _ExamPageState extends State<ExamPage> {
   /// Durasi ujian dummy: 10 menit.
   static const int examDurationSeconds = 10 * 60;
 
+  /// Channel audio native (MainActivity.kt -> MediaPlayer).
+  static const MethodChannel _audioChannel =
+      MethodChannel('ubt_korea_rebuild/audio');
+
+  /// Durasi file nada test (detik) — untuk progress bar saja;
+  /// penguncian soal mengikuti callback selesai dari native.
+  static const double _testToneSeconds = 11.2;
+
   static const List<double> speeds = <double>[0.75, 1.0, 1.25, 1.5];
 
   final Map<int, int> _answers = <int, int>{};
@@ -37,9 +46,7 @@ class _ExamPageState extends State<ExamPage> {
   int _currentIndex = 0;
   int _secondsLeft = examDurationSeconds;
   Timer? _examTimer;
-  final AudioPlayer _audioPlayer = AudioPlayer();
-  StreamSubscription<Duration>? _positionSub;
-  StreamSubscription<PlayerState>? _playerStateSub;
+  Timer? _audioTimer;
   double _speed = 1.0;
   double _audioProgress = 0.0; // 0..1 untuk soal yang sedang diputar
   bool _isPlayingAudio = false;
@@ -50,6 +57,11 @@ class _ExamPageState extends State<ExamPage> {
   @override
   void initState() {
     super.initState();
+    _audioChannel.setMethodCallHandler((call) async {
+      if (call.method == 'onAudioCompleted' && mounted) {
+        _markAudioPlayed();
+      }
+    });
     _examTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) {
         timer.cancel();
@@ -64,33 +76,34 @@ class _ExamPageState extends State<ExamPage> {
         }
       });
     });
-    _positionSub = _audioPlayer.positionStream.listen((position) {
-      final total = _audioPlayer.duration;
-      if (!mounted || total == null || total.inMilliseconds == 0) return;
-      setState(() {
-        _audioProgress =
-            position.inMilliseconds / total.inMilliseconds;
-      });
-    });
-    _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
-      if (!mounted) return;
-      if (state.processingState == ProcessingState.completed) {
-        setState(() {
-          _isPlayingAudio = false;
-          _audioProgress = 1.0;
-          _playedAudio.add(_current.id);
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
     _examTimer?.cancel();
-    _positionSub?.cancel();
-    _playerStateSub?.cancel();
-    _audioPlayer.dispose();
+    _audioTimer?.cancel();
+    _audioChannel.setMethodCallHandler(null);
+    _stopNativeAudio();
     super.dispose();
+  }
+
+  /// Dipanggil saat native melaporkan audio selesai (atau gagal diputar).
+  void _markAudioPlayed() {
+    _audioTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _isPlayingAudio = false;
+      _audioProgress = 1.0;
+      _playedAudio.add(_current.id);
+    });
+  }
+
+  Future<void> _stopNativeAudio() async {
+    try {
+      await _audioChannel.invokeMethod<void>('stopAudio');
+    } catch (_) {
+      // Abaikan: native tidak punya audio yang sedang jalan.
+    }
   }
 
   String get _timerText {
@@ -100,9 +113,11 @@ class _ExamPageState extends State<ExamPage> {
         '${seconds.toString().padLeft(2, '0')}';
   }
 
-  /// Pemutaran audio test nyata (nada dummy, bukan musik).
+  /// Pemutaran audio test nyata (nada dummy, bukan musik) via native.
   /// Hanya 1x per soal — setelah selesai, tombol terkunci.
-  /// Kalau file gagal diputar, soal langsung ditandai sudah diputar
+  /// Progress bar digerakkan Timer lokal; penguncian mengikuti
+  /// callback selesai dari native (atau Timer kalau callback telat).
+  /// Kalau channel gagal, soal langsung ditandai sudah diputar
   /// supaya ujian tidak macet.
   Future<void> _playAudio() async {
     if (_isPlayingAudio || _playedAudio.contains(_current.id)) return;
@@ -111,29 +126,55 @@ class _ExamPageState extends State<ExamPage> {
       _isPlayingAudio = true;
       _audioProgress = 0.0;
     });
+    _audioTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (!_isPlayingAudio) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _audioProgress += 0.1 * _speed / _testToneSeconds;
+        if (_audioProgress >= 1.0) {
+          _audioProgress = 1.0;
+          timer.cancel();
+          _isPlayingAudio = false;
+          _playedAudio.add(_current.id);
+        }
+      });
+    });
     try {
-      await _audioPlayer.setSpeed(_speed);
-      await _audioPlayer.setAsset('assets/audio/test_tone.mp3');
-      await _audioPlayer.play();
+      await _audioChannel.invokeMethod<void>(
+        'playTestTone',
+        <String, Object>{'speed': _speed},
+      );
     } catch (_) {
       if (!mounted) return;
+      _markAudioPlayed();
+    }
+  }
+
+  void _stopAudio() {
+    _audioTimer?.cancel();
+    _stopNativeAudio();
+    if (_isPlayingAudio) {
       setState(() {
         _isPlayingAudio = false;
-        _audioProgress = 1.0;
-        _playedAudio.add(_current.id);
+        _audioProgress = 0.0;
       });
     }
   }
 
-  Future<void> _stopAudio() async {
-    if (_isPlayingAudio) {
-      await _audioPlayer.stop();
-      if (mounted) {
-        setState(() {
-          _isPlayingAudio = false;
-          _audioProgress = 0.0;
-        });
-      }
+  Future<void> _setNativeSpeed(double speed) async {
+    try {
+      await _audioChannel.invokeMethod<void>(
+        'setSpeed',
+        <String, Object>{'speed': speed},
+      );
+    } catch (_) {
+      // Abaikan: native tidak sedang memutar.
     }
   }
 
@@ -216,7 +257,7 @@ class _ExamPageState extends State<ExamPage> {
     if (_submitted) return;
     _submitted = true;
     _examTimer?.cancel();
-    _audioPlayer.stop();
+    _stopAudio();
     final score = scoreDummyAnswers(_answers);
     if (!mounted) return;
     Navigator.pushReplacement(
@@ -335,7 +376,7 @@ class _ExamPageState extends State<ExamPage> {
                               onSelected: (_) {
                                 setState(() => _speed = s);
                                 if (_isPlayingAudio) {
-                                  _audioPlayer.setSpeed(s);
+                                  _setNativeSpeed(s);
                                 }
                               },
                             ),

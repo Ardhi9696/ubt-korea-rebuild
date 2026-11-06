@@ -30,8 +30,9 @@ Splash → Login → Informasi Peserta (+ countdown 5 dtk)
 - **Halaman Ujian (dummy)** — topbar detail peserta, timer mundur 10 menit,
   10 soal buatan sendiri (5 reading + 5 listening), 4 pilihan jawaban,
   audio listening **play-once nyata** (file nada test buatan sendiri
-  `assets/audio/test_tone.mp3`, 11 detik, diputar via just_audio,
-  terkunci setelah 1x putar), kontrol kecepatan **0.75x / 1.0x / 1.25x / 1.5x**
+  `assets/audio/test_tone.mp3`, 11 detik, diputar via MethodChannel +
+  MediaPlayer bawaan Android di `MainActivity.kt`, terkunci setelah
+  1x putar), kontrol kecepatan **0.75x / 1.0x / 1.25x / 1.5x**
   yang mengubah kecepatan putar, grid total soal (bottom sheet),
   Submit manual (dialog konfirmasi) + **auto-submit** saat waktu habis.
 - **Hasil (dummy)** — skor reading/listening dari kunci dummy lokal
@@ -46,8 +47,9 @@ Splash → Login → Informasi Peserta (+ countdown 5 dtk)
 - ❌ Tanpa backend — backend asli (`eps.ubtcloud.me`) **tidak dipakai
   dan tidak pernah dihubungi**. Nol network call, nol permission
   (tanpa INTERNET, tanpa kamera/mic).
-- ❌ Satu dependensi pihak ketiga saja (just_audio, untuk audio test) —
-  sisanya hanya Flutter SDK.
+- ❌ Tanpa dependensi pihak ketiga — hanya Flutter SDK, supaya build CI
+  cepat dan andal. Audio test tidak pakai plugin (just_audio dilepas
+  2026-11-06 karena bikin build merah di Flutter 3.47).
 - ❌ Package beda: `com.leeubt.ubtkorea.rebuild` (bukan package asli).
 
 ## Menjalankan

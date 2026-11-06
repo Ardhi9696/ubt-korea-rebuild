@@ -8,12 +8,13 @@ environment:
   sdk: ^3.4.0
   flutter: ">=3.22.0"
 
-# Satu dependensi pihak ketiga: just_audio untuk pemutaran audio test
-# (dipakai app asli juga). Tanpa itu, build CI tetap tanpa dependensi lain.
+# NOL dependensi pihak ketiga: hanya Flutter SDK, supaya build CI cepat dan andal.
+# Audio test diputar lewat MethodChannel + MediaPlayer bawaan Android
+# (MainActivity.kt) — just_audio sengaja dilepas: di Flutter 3.47 ia bikin
+# build merah (embedding tidak sampai ke compile classpath MainActivity).
 dependencies:
   flutter:
     sdk: flutter
-  just_audio: ^0.10.6
 
 dev_dependencies:
   flutter_test:
