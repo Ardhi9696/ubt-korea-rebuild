@@ -1,0 +1,21 @@
+name: ubt_korea_rebuild
+description: "Rekonstruksi belajar tampilan UBT EPS TOPIK Korea (v1.0.15) dari temuan statik REA. Semua data dummy, tanpa backend, bukan app asli."
+# Bukan app asli dan tidak untuk dipublikasikan.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.4.0
+  flutter: ">=3.22.0"
+
+# NOL dependensi pihak ketiga: hanya Flutter SDK, supaya build CI cepat dan andal.
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
