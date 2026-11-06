@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'screens/splash_screen.dart';
 
-void main() => runApp(const UbtKoreaRebuildApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  // App asli berjalan landscape — kunci orientasi supaya layout kartu
+  // (mis. login) tampil seperti aslinya.
+  await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
+  runApp(const UbtKoreaRebuildApp());
+}
 
 /// Rekonstruksi belajar tampilan UBT EPS TOPIK Korea (v1.0.15).
 /// Semua data dummy, tanpa backend, tanpa network call.

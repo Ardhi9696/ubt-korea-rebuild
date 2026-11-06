@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../dummy_data.dart';
 import '../main.dart';
@@ -8,8 +9,9 @@ import 'result_screen.dart';
 
 /// Halaman ujian (dummy) — meniru `exam_page` di app Korea:
 /// topbar detail peserta, timer mundur, soal + 4 pilihan,
-/// audio play-once (simulasi Timer + progress bar, tanpa file audio),
-/// kontrol kecepatan 0.75x/1.0x/1.25x/1.5x yang mengubah durasi simulasi,
+/// audio play-once (file nada test `assets/audio/test_tone.mp3`,
+/// diputar lewat just_audio — sama seperti app asli yang pakai just_audio),
+/// kontrol kecepatan 0.75x/1.0x/1.25x/1.5x yang mengubah kecepatan putar,
 /// grid total soal (bottom sheet), submit manual + auto-submit saat waktu habis.
 class ExamPage extends StatefulWidget {
   const ExamPage({super.key, required this.exam, required this.user});
@@ -35,7 +37,9 @@ class _ExamPageState extends State<ExamPage> {
   int _currentIndex = 0;
   int _secondsLeft = examDurationSeconds;
   Timer? _examTimer;
-  Timer? _audioTimer;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<PlayerState>? _playerStateSub;
   double _speed = 1.0;
   double _audioProgress = 0.0; // 0..1 untuk soal yang sedang diputar
   bool _isPlayingAudio = false;
@@ -60,12 +64,32 @@ class _ExamPageState extends State<ExamPage> {
         }
       });
     });
+    _positionSub = _audioPlayer.positionStream.listen((position) {
+      final total = _audioPlayer.duration;
+      if (!mounted || total == null || total.inMilliseconds == 0) return;
+      setState(() {
+        _audioProgress =
+            position.inMilliseconds / total.inMilliseconds;
+      });
+    });
+    _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
+      if (!mounted) return;
+      if (state.processingState == ProcessingState.completed) {
+        setState(() {
+          _isPlayingAudio = false;
+          _audioProgress = 1.0;
+          _playedAudio.add(_current.id);
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _examTimer?.cancel();
-    _audioTimer?.cancel();
+    _positionSub?.cancel();
+    _playerStateSub?.cancel();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -76,40 +100,40 @@ class _ExamPageState extends State<ExamPage> {
         '${seconds.toString().padLeft(2, '0')}';
   }
 
-  /// Simulasi pemutaran audio: progress bar maju secepat `_speed`.
+  /// Pemutaran audio test nyata (nada dummy, bukan musik).
   /// Hanya 1x per soal — setelah selesai, tombol terkunci.
-  void _playAudio() {
+  /// Kalau file gagal diputar, soal langsung ditandai sudah diputar
+  /// supaya ujian tidak macet.
+  Future<void> _playAudio() async {
     if (_isPlayingAudio || _playedAudio.contains(_current.id)) return;
     if (_current.section != 'listening') return;
     setState(() {
       _isPlayingAudio = true;
       _audioProgress = 0.0;
     });
-    final total = _current.audioSeconds.toDouble();
-    _audioTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        _audioProgress += 0.1 * _speed / total;
-        if (_audioProgress >= 1.0) {
-          _audioProgress = 1.0;
-          _isPlayingAudio = false;
-          _playedAudio.add(_current.id);
-          timer.cancel();
-        }
-      });
-    });
-  }
-
-  void _stopAudio() {
-    _audioTimer?.cancel();
-    if (_isPlayingAudio) {
+    try {
+      await _audioPlayer.setSpeed(_speed);
+      await _audioPlayer.setAsset('assets/audio/test_tone.mp3');
+      await _audioPlayer.play();
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
         _isPlayingAudio = false;
-        _audioProgress = 0.0;
+        _audioProgress = 1.0;
+        _playedAudio.add(_current.id);
       });
+    }
+  }
+
+  Future<void> _stopAudio() async {
+    if (_isPlayingAudio) {
+      await _audioPlayer.stop();
+      if (mounted) {
+        setState(() {
+          _isPlayingAudio = false;
+          _audioProgress = 0.0;
+        });
+      }
     }
   }
 
@@ -192,7 +216,7 @@ class _ExamPageState extends State<ExamPage> {
     if (_submitted) return;
     _submitted = true;
     _examTimer?.cancel();
-    _audioTimer?.cancel();
+    _audioPlayer.stop();
     final score = scoreDummyAnswers(_answers);
     if (!mounted) return;
     Navigator.pushReplacement(
@@ -275,8 +299,9 @@ class _ExamPageState extends State<ExamPage> {
                   if (isListening) ...<Widget>[
                     const SizedBox(height: 16),
                     const Text(
-                      'Audio dummy: simulasi pemutaran (bukan file audio). '
-                      'Kecepatan mengubah durasi simulasi.',
+                      'Audio test (nada dummy, bukan musik): diputar 1x, '
+                      'terkunci setelah selesai. Kecepatan mengubah '
+                      'kecepatan putar.',
                     ),
                     const SizedBox(height: 8),
                     LinearProgressIndicator(value: _audioProgress),
@@ -299,7 +324,7 @@ class _ExamPageState extends State<ExamPage> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const Text('Kecepatan audio (dummy):'),
+                    const Text('Kecepatan audio:'),
                     Wrap(
                       spacing: 8,
                       children: speeds
@@ -307,8 +332,12 @@ class _ExamPageState extends State<ExamPage> {
                             (s) => ChoiceChip(
                               label: Text('${s}x'),
                               selected: _speed == s,
-                              onSelected: (_) =>
-                                  setState(() => _speed = s),
+                              onSelected: (_) {
+                                setState(() => _speed = s);
+                                if (_isPlayingAudio) {
+                                  _audioPlayer.setSpeed(s);
+                                }
+                              },
                             ),
                           )
                           .toList(),

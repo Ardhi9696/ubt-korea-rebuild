@@ -61,7 +61,6 @@ class DummyQuestion {
     required this.text,
     required this.options,
     required this.correctIndex,
-    this.audioSeconds = 0,
   });
 
   final int id;
@@ -69,14 +68,12 @@ class DummyQuestion {
   final String text;
   final List<String> options;
   final int correctIndex;
-
-  /// Durasi simulasi audio (soal listening saja). Bukan file audio beneran.
-  final int audioSeconds;
 }
 
 /// 10 soal dummy buatan sendiri: 5 reading + 5 listening.
-/// Soal listening menyertakan "naskah audio dummy" sebagai teks, karena
-/// audio di sini hanya simulasi progress bar — di app asli hanya ada suara.
+/// Soal listening memakai satu file nada test yang sama
+/// (`assets/audio/test_tone.mp3`, deret nada sine buatan sendiri) —
+/// di app asli hanya ada suara, bukan teks.
 const List<DummyQuestion> dummyQuestions = <DummyQuestion>[
   // ---- Reading (5) ----
   DummyQuestion(
@@ -126,7 +123,6 @@ const List<DummyQuestion> dummyQuestions = <DummyQuestion>[
     text: '[Audio dummy] “사과를 먹어요.” — Apa yang dimakan?',
     options: <String>['Apel', 'Pisang', 'Roti', 'Nasi'],
     correctIndex: 0,
-    audioSeconds: 6,
   ),
   DummyQuestion(
     id: 7,
@@ -134,7 +130,6 @@ const List<DummyQuestion> dummyQuestions = <DummyQuestion>[
     text: '[Audio dummy] “지금 몇 시예요?” — “세 시예요.” — Jam berapa?',
     options: <String>['Jam 2', 'Jam 3', 'Jam 4', 'Jam 5'],
     correctIndex: 1,
-    audioSeconds: 6,
   ),
   DummyQuestion(
     id: 8,
@@ -142,7 +137,6 @@ const List<DummyQuestion> dummyQuestions = <DummyQuestion>[
     text: '[Audio dummy] “어디에 가요?” — “학교에 가요.” — Ke mana dia pergi?',
     options: <String>['Sekolah', 'Rumah', 'Pasar', 'Bank'],
     correctIndex: 0,
-    audioSeconds: 6,
   ),
   DummyQuestion(
     id: 9,
@@ -150,7 +144,6 @@ const List<DummyQuestion> dummyQuestions = <DummyQuestion>[
     text: '[Audio dummy] “이 사람은 누구예요?” — “선생님이에요.” — Siapa dia?',
     options: <String>['Guru', 'Dokter', 'Polisi', 'Koki'],
     correctIndex: 0,
-    audioSeconds: 6,
   ),
   DummyQuestion(
     id: 10,
@@ -158,7 +151,6 @@ const List<DummyQuestion> dummyQuestions = <DummyQuestion>[
     text: '[Audio dummy] “날씨가 어때요?” — “비가 와요.” — Bagaimana cuacanya?',
     options: <String>['Hujan', 'Cerah', 'Salju', 'Berangin'],
     correctIndex: 0,
-    audioSeconds: 6,
   ),
 ];
 
