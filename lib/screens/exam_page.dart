@@ -319,17 +319,21 @@ class _ExamPageState extends State<ExamPage> {
                     'Pilih jawaban:',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  ...List<Widget>.generate(
-                    _current.options.length,
-                    (i) => RadioListTile<int>(
-                      title: Text(_current.options[i]),
-                      value: i,
-                      groupValue: _answers[_current.id],
-                      onChanged: (v) {
-                        if (v != null) {
-                          setState(() => _answers[_current.id] = v);
-                        }
-                      },
+                  RadioGroup<int>(
+                    groupValue: _answers[_current.id],
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() => _answers[_current.id] = v);
+                      }
+                    },
+                    child: Column(
+                      children: List<Widget>.generate(
+                        _current.options.length,
+                        (i) => RadioListTile<int>(
+                          title: Text(_current.options[i]),
+                          value: i,
+                        ),
+                      ),
                     ),
                   ),
                 ],

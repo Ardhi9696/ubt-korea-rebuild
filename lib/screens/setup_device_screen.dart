@@ -179,7 +179,7 @@ class _SetupDeviceScreenState extends State<SetupDeviceScreen> {
           // tidak menghalangi sentuhan).
           IgnorePointer(
             child: Container(
-              color: Colors.black.withOpacity((1 - _brightness) * 0.75),
+              color: Colors.black.withValues(alpha: (1 - _brightness) * 0.75),
             ),
           ),
         ],
